@@ -44,46 +44,44 @@ int main(void) {
 	}
 }
 
+// ISR:     triggered by a trigger pull (low level on INT0)
+// EFFECTS: energizes the solenoid and starts the 16-bit CTC mode timer
 ISR(INT0_vect) {
-	// ISR triggered by trigger pull
-	// Creates a fixed-width pulse on the solenoid pin
-
-	// TODO: _delay_ms() needs a compile time constant parameter
-	// Might be better to use a hardware timer with another interrupt to
-	// turn off the solenoid, but that might not have an accurate pulse width
-	// guess we'll just have to try it out and see...
-
 	PORTB = 0xFF;				// Energize the solenoid
-	_delay_ms(timer_setting);	// Wait for set time
-	PORTB = 0x0;				// De-energize solenoid
+	// TODO: turn on the specific INT0 bit on PORTB, not all of PORTB
+	// TODO: start 16-bit counter
 }
 
+// ISR:	    triggered by any change in the programming switches (PCINT on B register)
+// EFFECTS: converts the 8-bit B register to an unsigned char for the timer setting
 ISR(PCINT2_vect) {
-	// ISR triggered by change in any of the programming switches
-	// Converts PORTB into an unsigned char.
 	timer_setting = PINB;
 }
 
+// EFFECTS: sets the data direction and pullups for each IO pin
 void pin_setup(void) {
 	// TRIGGER INTERRUPT (Input)
 	// TODO: trigger interrupt pin setup
-
+	// ...
+	
 	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled)
 	DDRB = 0x0;
 	PORTB = 0xFF;
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
+	// ...
 }
 
+// EFFECTS: intializes the interrupt registers for INT0 and PCINT2 (trigger and switches)
 void interrupt_setup(void) {
 	// TRIGGER INTERRUPT
-	EICRA = 0x00;			// ISR triggers on low level
+	EICRA = 0x00;		// ISR triggers on low level
 	EIMSK |= (1 << INT0);   // Enable INT0
 
 	// PROGRAMMING SWITCHES INTERRUPT
 	PCICR |= _BV(PCIE0);	// Enable the PCI-0 ISR (PORTB)
-	PCMSK0 = 0xFF;			// Enable all pins on PCI[7:0] as interrupts
+	PCMSK0 = 0xFF;		// Enable all pins on PCI[7:0] as interrupts
 
 	// SETUP
 	sei();	// Enable global interrupts
