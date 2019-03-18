@@ -5,7 +5,7 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
-#define F_CPU 		16000000
+#define F_CPU 			16000000
 
 #define TRIGGER_DDR		DDRB
 #define TRIGGER_PORT	PORTB
@@ -20,7 +20,8 @@
 #define SOL_PORT		PORTB
 #define SOL_BIT 		PORTB1
 
-#define PRESCALER 		8
+#define PRESCALER 		64
+#define DELAY_CONSTANT	1000
 
 void pin_setup(void);
 void interrupt_setup(void);
@@ -47,14 +48,14 @@ int main(void) {
 }
 
 // ISR:		Triggered by a change on the trigger pin.
-// EFFECTS:	Solenoid is energized on trigger falling edge
+// EFFECTS:	Solenoid is energized on trigger rising edge
 ISR(PCINT0_vect) {
-	if(TRIGGER & _BV(TRIGGER_BIT)) return; // Do nothing if the trigger has been released
+	if(!(TRIGGER & _BV(TRIGGER_BIT))) return; // Do nothing if the trigger has been released
 
 	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
 
 	SOL_PORT |= _BV(SOL_BIT);			// Energize the solenoid
-	TCCR1B |= (1 << CS11);				// Enable TIMER1, pre-scalar=8
+	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
@@ -64,7 +65,7 @@ ISR(TIMER1_COMPA_vect) {
 	SOL_PORT &= ~_BV(SOL_BIT);
 
 	// Disable and reset TIMER1
-	TCCR1B &=  ~_BV(CS11);
+	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);
 	TCNT1 = 0;
 
 	// System has completed handling the trigger sequence
@@ -125,5 +126,5 @@ void power_setup(void) {
 //			given the desired millisecond input on the PROG switches.
 // NOTE:	Programming switches are a binary representation of 0.1ms increments.
 uint16_t calc_compare_val(void) {
-	return (uint16_t)(F_CPU / 10000 / PRESCALER * (uint8_t)~PROG);
+	return (uint16_t)(F_CPU / 10000 / PRESCALER * ((uint8_t)~PROG + DELAY_CONSTANT));
 }
