@@ -7,18 +7,25 @@
 
 #define F_CPU 		16000000
 
-#define PROG		PINB
-#define PROG_PORT	PORTB
-#define PROG_DDR	DDRB
+#define TRIGGER_DDR		DDRB
+#define TRIGGER_PORT	PORTB
+#define TRIGGER_BIT		PORTB0
+#define TRIGGER 		PINB
 
-#define SOL_PORT	PORTD
-#define SOL_BIT 	PORTD0
+#define PROG_DDR		DDRD
+#define PROG_PORT		PORTD
+#define PROG			PIND
 
-#define PRESCALER 	64
+#define SOL_DDR			DDRB
+#define SOL_PORT		PORTB
+#define SOL_BIT 		PORTB1
+
+#define PRESCALER 		8
 
 void pin_setup(void);
 void interrupt_setup(void);
-uint16_t calc_compare_val();
+void power_setup(void);
+uint16_t calc_compare_val(void);
 
 // Flag for determining if the system is handling a trigger interrupt sequence.
 volatile uint8_t trigger_pulled_flag;
@@ -39,52 +46,61 @@ int main(void) {
 	}
 }
 
-// ISR:     triggered by a trigger pull (low level on INT0)
-// EFFECTS: energizes the solenoid and starts the 16-bit CTC mode timer
-ISR(INT0_vect) {
-	trigger_pulled_flag = 1;	// System is now handling the trigger sequence
+// ISR:		Triggered by a change on the trigger pin.
+// EFFECTS:	Solenoid is energized on trigger falling edge
+ISR(PCINT0_vect) {
+	if(TRIGGER & _BV(TRIGGER_BIT)) return; // Do nothing if the trigger has been released
+
+	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
 
 	SOL_PORT |= _BV(SOL_BIT);			// Energize the solenoid
-	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
+	TCCR1B |= (1 << CS11);				// Enable TIMER1, pre-scalar=8
 }
 
-// ISR:		triggered by a match compare on TIMER1 (CTC mode non-PWM)
-// EFFECTS:	de-energizes solenoid, disables and resets TIMER1.
+// ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
+// EFFECTS:	De-energizes the solenoid, disables and resets TIMER1.
 ISR(TIMER1_COMPA_vect) {
-	SOL_PORT &= ~_BV(SOL_BIT);	// de-energize the solenoid
+	// De-energize the solenoid
+	SOL_PORT &= ~_BV(SOL_BIT);
 
-	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10) & ~_BV(CS00);	// disable TIMER1
-	TCNT1 = 0;	// Reset TIMER1 to zero
+	// Disable and reset TIMER1
+	TCCR1B &=  ~_BV(CS11);
+	TCNT1 = 0;
 
-	trigger_pulled_flag = 0;	// System has handled the trigger sequence
+	// System has completed handling the trigger sequence
+	trigger_pulled_flag = 0;
 }
 
-// ISR:	    triggered by any change in the programming switches (PCINT)
-// EFFECTS: sets the CTC compare value to the calculated timer value
+// ISR:	    Triggered by any change in the programming switches (PCINT2)
+// EFFECTS: Sets the CTC compare value to the value calculated from the switches
 ISR(PCINT2_vect) {
 	OCR1A = calc_compare_val();
 }
 
-// EFFECTS: sets the data direction and pull-ups for each IO pin
+// EFFECTS: Sets the data direction and pull-ups for each IO pin
 void pin_setup(void) {
-	// TRIGGER INTERRUPT (Input)
-	// TODO: trigger interrupt pin setup
-	// ...
+	// TRIGGER INTERRUPT (Input, Pullup Disabled)
+	TRIGGER_DDR &= ~_BV(TRIGGER_BIT);
+	TRIGGER_PORT &= ~_BV(TRIGGER_BIT);
 
 	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled)
 	PROG_DDR = 0x0;
 	PROG_PORT = 0xFF;
+
+	// SOLENOID (Output, initially LOW)
+	SOL_DDR |= _BV(SOL_BIT);
+	SOL_PORT &= ~_BV(SOL_BIT);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
 	// ...
 }
 
-// EFFECTS: initializes the interrupt registers for trigger, timer, and prog. switches
+// EFFECTS: Initializes the interrupt registers for trigger, timer, and prog. switches
 void interrupt_setup(void) {
 	// TRIGGER EXTERNAL INTERRUPT
-	EICRA = 0x00;			// ISR triggers on low level
-	EIMSK |= (1 << INT0);   // Enable the INT0 interrupt vector
+	PCICR |= _BV(PCIE0);		// Enable the PCI-0 ISR (PORTB)
+	PCMSK0 |= _BV(TRIGGER_BIT);	// Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
 	TCCR1B |= (1 << WGM12);		// Setup timer for CTC mode
@@ -93,15 +109,21 @@ void interrupt_setup(void) {
 	TIMSK1 |= (1 << OCIE1A);	// Enable the CTC interrupt vector
 
 	// PROGRAMMING SWITCHES INTERRUPT
-	PCICR |= _BV(PCIE0);	// Enable the PCI-0 ISR (PORTB)
-	PCMSK0 = 0xFF;			// Enable all pins on PCI[7:0] (PORTB) as interrupts
+	PCICR |= _BV(PCIE2);		// Enable the PCI-2 ISR (PORTD)
+	PCMSK2 = 0xFF;				// Enable all pins on PCI[23:16] (PORTD) as interrupts
 
 	// SETUP
-	sei();	// Enable global interrupts
+	sei();						// Enable global interrupts
+}
+
+// EFFECTS: Modifies necessary registers for reducing power consumption
+void power_setup(void) {
+	// TODO: implement this function
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
 //			given the desired millisecond input on the PROG switches.
-uint16_t calc_compare_val() {
-	return (uint16_t)((F_CPU * ~PROG) / (1000 * PRESCALER));
+// NOTE:	Programming switches are a binary representation of 0.1ms increments.
+uint16_t calc_compare_val(void) {
+	return (uint16_t)(F_CPU / 10000 / PRESCALER * (uint8_t)~PROG);
 }

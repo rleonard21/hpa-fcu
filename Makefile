@@ -4,7 +4,7 @@ CFLAGS=-g -Os -Wall -mcall-prologues -mmcu=atmega$(MEGA)
 OBJ2HEX=/usr/bin/avr-objcopy 
 PROG=/usr/bin/avrdude
 TARGET=binary
-FILES=tests/ProgrammingHandler_tests.c ProgrammingHandler.c
+FILES=main.c
 
 build: 
 	# compile the source files
