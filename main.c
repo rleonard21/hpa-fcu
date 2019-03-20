@@ -20,8 +20,9 @@
 #define SOL_PORT		PORTB
 #define SOL_BIT 		PORTB1
 
-#define PRESCALER 		64
-#define DELAY_CONSTANT	1000
+#define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
+#define DELAY_CONSTANT	100		/* Accounts for the response time of the solenoid */
+#define DELAY_FACTOR	10		/* Changes the increment value of the prog. switches */
 
 void pin_setup(void);
 void interrupt_setup(void);
@@ -50,7 +51,8 @@ int main(void) {
 // ISR:		Triggered by a change on the trigger pin.
 // EFFECTS:	Solenoid is energized on trigger rising edge
 ISR(PCINT0_vect) {
-	if(!(TRIGGER & _BV(TRIGGER_BIT))) return; // Do nothing if the trigger has been released
+	if(!(TRIGGER & _BV(TRIGGER_BIT))) return;	// Do nothing if the trigger has been released
+	if(trigger_pulled_flag) return;		// Do nothing if currently handling trigger pull
 
 	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
 
@@ -126,5 +128,6 @@ void power_setup(void) {
 //			given the desired millisecond input on the PROG switches.
 // NOTE:	Programming switches are a binary representation of 0.1ms increments.
 uint16_t calc_compare_val(void) {
-	return (uint16_t)(F_CPU / 10000 / PRESCALER * ((uint8_t)~PROG + DELAY_CONSTANT));
+	return (uint16_t)(F_CPU / (1000 * DELAY_FACTOR) / PRESCALER *
+					  ((uint8_t)~PROG + DELAY_CONSTANT));
 }
