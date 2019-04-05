@@ -6,17 +6,22 @@
 
 #define F_CPU 			16000000
 
-#define TRIGGER_DDR		DDRB
-#define TRIGGER_PORT	PORTB
 #define TRIGGER_BIT		PORTB0
 #define TRIGGER 		PINB
 
-#define PROG_DDR		DDRD
 #define PROG_PORT		PORTD
 #define PROG			PIND
 
 #define SOL_DDR			DDRB
 #define SOL_BIT 		PORTB1
+
+#define RED_LED_DDR		DDRB
+#define RED_LED_PORT	PORTB
+#define RED_LED_BIT		PORTB3
+
+#define GREEN_LED_DDR	DDRB
+#define GREEN_LED_PORT	PORTB
+#define GREEN_LED_BIT	PORTB5
 
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
 #define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
@@ -37,6 +42,10 @@ int main(void) {
 
 	// Set the flag to false, indicating system is not handling a trigger pull.
 	trigger_pulled_flag = 0;
+
+	// TODO: implement the one-time battery voltage check and flash LEDs
+	RED_LED_PORT |= _BV(RED_LED_BIT);
+	GREEN_LED_PORT |= _BV(GREEN_LED_BIT);
 
 	while(1) {
 		if(!trigger_pulled_flag) {
@@ -93,16 +102,18 @@ ISR(PCINT2_vect) {
 // EFFECTS: Sets the data direction and pull-ups for each IO pin
 void pin_setup(void) {
 	// TRIGGER INTERRUPT (Input, Pullup Disabled)
-	TRIGGER_DDR &= ~_BV(TRIGGER_BIT);
-	TRIGGER_PORT &= ~_BV(TRIGGER_BIT);
+	// No operations here, DDR and PORT initialize to correct values by default
 
-	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled)
-	PROG_DDR = 0x0;
+	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled; DDR defaults to 0)
 	PROG_PORT = 0xFF;
 
 	// SOLENOID (Output, preset OC1A to set on match)
 	SOL_DDR |= _BV(SOL_BIT);
 	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
+
+	// LED INDICATORS (Output, initially low; PORT defaults to zero)
+	RED_LED_DDR |= _BV(RED_LED_BIT);
+	GREEN_LED_DDR |= _BV(GREEN_LED_BIT);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
@@ -117,9 +128,8 @@ void interrupt_setup(void) {
 
 	// TRIGGER TIMER INTERRUPT
 	TCCR1B |= _BV(WGM12);		// Setup timer for CTC mode
-	TCNT1 = 0;					// Initialize the counter
 	OCR1A = calc_compare_val(); // Initialize the compare value
-	TIMSK1 |= _BV(OCIE1A);	// Enable the CTC interrupt vector
+	TIMSK1 |= _BV(OCIE1A);		// Enable the CTC interrupt vector
 
 	// PROGRAMMING SWITCHES INTERRUPT
 	PCICR |= _BV(PCIE2);		// Enable the PCI-2 ISR (PORTD)
