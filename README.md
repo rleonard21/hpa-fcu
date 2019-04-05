@@ -6,16 +6,16 @@ to turn on and off the solenoid valve. The benefit of this implementation is
 that the solenoid is turned off synchronously with the timer match with 
 hardware, which should (in theory) beat the master branch's interrupt 
 driven system that toggles the solenoid by moving bits into registers. 
-In practice, though, the timing is identical in both systems to at least 10us 
-(as best my oscilloscope can measure the pulse width). The difference between
-the two implementations, if there really is one, is insignificant compared to
+In practice, this theory holds. The `OC1A` hardware variation of the firmware
+is indeed around 1us faster than the firmware driven toggle. However, this
+difference between the two implementations is insignificant compared to
 the slew rate of the solenoid. The solenoid will take orders of magnitude
-more time to move than the timing difference betweent the two versions of the
+more time to move than the timing difference between the two versions of the
 firmware. I have chosen to continue without the hardware-based `OC1A` toggling
-because the firmware is larger by around ~50 bytes and because the cheaper
+because the firmware is larger by around ~30 bytes and because the cheaper
 ATMega328PB does not support the necessary force output compare functionality
 present in the ATMega328/P. The benefits of the `OC1A` implementation are
-insignificant, if present, and the downsides are non-negligible.
+somewhat insignificant and the downsides are non-negligible.
 
 ## Hardware Description
 The firmware runs on an ATMega328P-AU AVR microcontroller (the firmware
