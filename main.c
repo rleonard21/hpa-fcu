@@ -56,19 +56,22 @@ ISR(PCINT0_vect) {
 
 	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
 
-	SOL_PORT |= _BV(SOL_BIT);			// Energize the solenoid
+	// TODO: implement the following comments to (energize the solenoid by force compare)
+	// Force output compare (timer control register should be preset to set OC1A on match prior to this ISR)
+	// Enable reset OC1A on output compare	
+
 	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
-// EFFECTS:	De-energizes the solenoid, disables and resets TIMER1.
+// EFFECTS:	Enables set OC1A on match and disables and resets TIMER1.
 ISR(TIMER1_COMPA_vect) {
-	// De-energize the solenoid
-	SOL_PORT &= ~_BV(SOL_BIT);
-
 	// Disable and reset TIMER1
 	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);
 	TCNT1 = 0;
+
+	// TODO: implement the following comments:
+	// Enable set OC1A on match (OC1A is force matched by trigger)
 
 	// System has completed handling the trigger sequence
 	trigger_pulled_flag = 0;
@@ -89,7 +92,8 @@ void pin_setup(void) {
 	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled)
 	PROG_DDR = 0x0;
 	PROG_PORT = 0xFF;
-
+	
+	// TODO: probably delete this because solenoid is mux'd to OC1A output
 	// SOLENOID (Output, initially LOW)
 	SOL_DDR |= _BV(SOL_BIT);
 	SOL_PORT &= ~_BV(SOL_BIT);
@@ -105,6 +109,7 @@ void interrupt_setup(void) {
 	PCICR |= _BV(PCIE0);		// Enable the PCI-0 ISR (PORTB)
 	PCMSK0 |= _BV(TRIGGER_BIT);	// Enable PORTB0 for PCINT (PCINT0)
 
+	// TODO: enable set OC1A on match
 	// TRIGGER TIMER INTERRUPT
 	TCCR1B |= (1 << WGM12);		// Setup timer for CTC mode
 	TCNT1 = 0;					// Initialize the counter
