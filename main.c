@@ -19,7 +19,7 @@
 #define SOL_BIT 		PORTB1
 
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
-#define DELAY_CONSTANT	100		/* Accounts for the response time of the solenoid */
+#define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
 #define DELAY_FACTOR	10		/* Changes the increment value of the prog. switches */
 
 void pin_setup(void);
