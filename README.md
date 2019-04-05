@@ -1,28 +1,9 @@
-# HPA Fire Control Unit (OC1A Branch)
-
-## What is this Branch?
-This branch is the implementation of the FCU using the `OC1A` pin functionality
-to turn on and off the solenoid valve. The benefit of this implementation is
-that the solenoid is turned off synchronously with the timer match with 
-hardware, which should (in theory) beat the master branch's interrupt 
-driven system that toggles the solenoid by moving bits into registers. 
-In practice, this theory holds. The `OC1A` hardware variation of the firmware
-is indeed around 1us faster than the firmware driven toggle. However, this
-difference between the two implementations is insignificant compared to
-the slew rate of the solenoid. The solenoid will take orders of magnitude
-more time to move than the timing difference between the two versions of the
-firmware. I have chosen to continue without the hardware-based `OC1A` toggling
-because the firmware is larger by around ~30 bytes and because the cheaper
-ATMega328PB does not support the necessary force output compare functionality
-present in the ATMega328/P. The benefits of the `OC1A` implementation are
-somewhat insignificant and the downsides are non-negligible.
+# HPA Fire Control Unit
 
 ## Hardware Description
-The firmware runs on an ATMega328P-AU AVR microcontroller (the firmware
-is under 500 bytes when compiled with `-Os`, so a smaller MCU may be
-warranted). The ATMega328PB will not work with this firmware due to a lack
-of the force output compare function for the 16-bit timer.
-The trigger is a snap-action limit switch that is attached
+The firmware runs on an ATMega48/88/168/328/P/PB AVR microcontroller (the firmware
+is around 500 bytes when compiled with `-Os`, so a smaller MCU may be
+warranted). The trigger is a snap-action limit switch that is attached
 directly to the rifle's trigger housing via a PCB. The trigger is debounced
 entirely in hardware, which enables for direct interrupt control on the MCU
 and simpler code overall. The trigger debouncing consists of an RC-filter
@@ -59,8 +40,7 @@ subsequently waits for the next interrupt to occur. During the period
 between the handling of the trigger ISR and the timer ISR, a flag
 is set to indicate that the firing sequence is being handled. This
 flag prevents the system from handling any additional trigger pulls
-while the firing sequence is happening, which prevents problems such
-as a mistimed solenoid release.    
+while the firing sequence is happening.
 
 #### Programming Switches and Delay
 The programming
