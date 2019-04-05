@@ -58,7 +58,9 @@ ISR(PCINT0_vect) {
 
 	// TODO: implement the following comments to (energize the solenoid by force compare)
 	// Force output compare (timer control register should be preset to set OC1A on match prior to this ISR)
-	// Enable reset OC1A on output compare	
+	// Enable reset OC1A on output compare
+	TCCR1C |= _BV(FOC1A);
+	TCCR1A &= ~_BV(COM1A0);
 
 	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
 }
@@ -72,6 +74,7 @@ ISR(TIMER1_COMPA_vect) {
 
 	// TODO: implement the following comments:
 	// Enable set OC1A on match (OC1A is force matched by trigger)
+	TCCR1A |= _BV(COM1A0);
 
 	// System has completed handling the trigger sequence
 	trigger_pulled_flag = 0;
@@ -96,7 +99,7 @@ void pin_setup(void) {
 	// TODO: probably delete this because solenoid is mux'd to OC1A output
 	// SOLENOID (Output, initially LOW)
 	SOL_DDR |= _BV(SOL_BIT);
-	SOL_PORT &= ~_BV(SOL_BIT);
+	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
