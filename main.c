@@ -3,7 +3,6 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <util/delay.h>
 
 #define F_CPU 			16000000
 
@@ -17,12 +16,10 @@
 #define PROG			PIND
 
 #define SOL_DDR			DDRB
-#define SOL_PORT		PORTB
-#define SOL_PIN			PINB
 #define SOL_BIT 		PORTB1
 
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
-#define DELAY_CONSTANT	100		/* Accounts for the response time of the solenoid */
+#define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
 #define DELAY_FACTOR	10		/* Changes the increment value of the prog. switches */
 
 void pin_setup(void);
@@ -51,25 +48,37 @@ int main(void) {
 
 // ISR:		Triggered by a change on the trigger pin.
 // EFFECTS:	Solenoid is energized on trigger rising edge
+// NOTE:	OC1A is preset to set on output compare
 ISR(PCINT0_vect) {
-	if(!(TRIGGER & _BV(TRIGGER_BIT))) return;	// Do nothing if the trigger has been released
-	if(trigger_pulled_flag) return;		// Do nothing if currently handling trigger pull
+	// Do nothing if the trigger has been released
+	if(!(TRIGGER & _BV(TRIGGER_BIT))) return;
 
-	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
+	// Do nothing if currently handling trigger pull
+	if(trigger_pulled_flag) return;
 
-	SOL_PIN |= _BV(SOL_BIT);			// Energize the solenoid
-	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
+	// System is now handling the trigger sequence
+	trigger_pulled_flag = 1;
+
+	// Force output compare to set solenoid
+	TCCR1C |= _BV(FOC1A);
+
+	// Enable clear OC1A on output compare
+	TCCR1A &= ~_BV(COM1A0);
+
+	// Enable TIMER1, pre-scalar=64
+	TCCR1B |= _BV(CS11) | _BV(CS10);
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
-// EFFECTS:	De-energizes the solenoid, disables and resets TIMER1.
+// EFFECTS:	Enables set OC1A on match and disables and resets TIMER1.
+// NOTE:	OC1A clears in hardware immediately on match
 ISR(TIMER1_COMPA_vect) {
-	// De-energize the solenoid
-	SOL_PIN |= ~_BV(SOL_BIT);
-
 	// Disable and reset TIMER1
 	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);
 	TCNT1 = 0;
+
+	// Enable set OC1A on match
+	TCCR1A |= _BV(COM1A0);
 
 	// System has completed handling the trigger sequence
 	trigger_pulled_flag = 0;
@@ -91,9 +100,9 @@ void pin_setup(void) {
 	PROG_DDR = 0x0;
 	PROG_PORT = 0xFF;
 
-	// SOLENOID (Output, initially LOW)
+	// SOLENOID (Output, preset OC1A to set on match)
 	SOL_DDR |= _BV(SOL_BIT);
-	SOL_PORT &= ~_BV(SOL_BIT);
+	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
@@ -107,10 +116,10 @@ void interrupt_setup(void) {
 	PCMSK0 |= _BV(TRIGGER_BIT);	// Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
-	TCCR1B |= (1 << WGM12);		// Setup timer for CTC mode
+	TCCR1B |= _BV(WGM12);		// Setup timer for CTC mode
 	TCNT1 = 0;					// Initialize the counter
 	OCR1A = calc_compare_val(); // Initialize the compare value
-	TIMSK1 |= (1 << OCIE1A);	// Enable the CTC interrupt vector
+	TIMSK1 |= _BV(OCIE1A);	// Enable the CTC interrupt vector
 
 	// PROGRAMMING SWITCHES INTERRUPT
 	PCICR |= _BV(PCIE2);		// Enable the PCI-2 ISR (PORTD)
