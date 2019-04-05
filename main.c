@@ -18,6 +18,7 @@
 
 #define SOL_DDR			DDRB
 #define SOL_PORT		PORTB
+#define SOL_PIN			PINB
 #define SOL_BIT 		PORTB1
 
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
@@ -56,7 +57,7 @@ ISR(PCINT0_vect) {
 
 	trigger_pulled_flag = 1;			// System is now handling the trigger sequence
 
-	SOL_PORT |= _BV(SOL_BIT);			// Energize the solenoid
+	SOL_PIN |= _BV(SOL_BIT);			// Energize the solenoid
 	TCCR1B |= (1 << CS11)|(1 << CS10);	// Enable TIMER1, pre-scalar=64
 }
 
@@ -64,7 +65,7 @@ ISR(PCINT0_vect) {
 // EFFECTS:	De-energizes the solenoid, disables and resets TIMER1.
 ISR(TIMER1_COMPA_vect) {
 	// De-energize the solenoid
-	SOL_PORT &= ~_BV(SOL_BIT);
+	SOL_PIN |= ~_BV(SOL_BIT);
 
 	// Disable and reset TIMER1
 	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);

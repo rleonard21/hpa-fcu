@@ -34,8 +34,3 @@ include_directories(pwm)
 include_directories(sensors)
 
 add_executable(main main.c)
-
-add_executable(ProgrammingHandler_tests
-        ProgrammingHandler.c ProgrammingHandler.h
-        tests/ProgrammingHandler_tests.c
-        )
