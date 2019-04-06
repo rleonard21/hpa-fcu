@@ -3,6 +3,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/sleep.h>
 
 #define F_CPU 			16000000
 
@@ -36,6 +37,9 @@ uint16_t calc_compare_val(void);
 volatile uint8_t trigger_pulled_flag;
 
 int main(void) {
+	// Set up the power reduction registers
+	power_setup();
+
 	// Set up all pins for I/O
 	pin_setup();
 	interrupt_setup();
@@ -44,13 +48,15 @@ int main(void) {
 	trigger_pulled_flag = 0;
 
 	// TODO: implement the one-time battery voltage check and flash LEDs
-	RED_LED_PORT |= _BV(RED_LED_BIT);
-	GREEN_LED_PORT |= _BV(GREEN_LED_BIT);
 
 	while(1) {
 		if(!trigger_pulled_flag) {
-			// System is not handling a trigger pull, so put device to sleep
-			// TODO: put device into power-save mode
+			// Enables sleep and puts the device under
+			sleep_enable();
+			sleep_mode();
+
+			// Execution resumes here upon exit of waking interrupt
+			sleep_disable();
 		}
 	}
 }
@@ -141,7 +147,29 @@ void interrupt_setup(void) {
 
 // EFFECTS: Modifies necessary registers for reducing power consumption
 void power_setup(void) {
-	// TODO: implement this function
+	// Disable the I2C interface
+	PRR |= _BV(PRTWI);
+
+	// Disable timer 0 and 2
+	PRR |= _BV(PRTIM0);
+	PRR |= _BV(PRTIM2);
+
+	// Disable the SPI module
+	PRR |= _BV(PRSPI);
+
+	// Disable the USART module
+	PRR |= _BV(PRUSART0);
+
+	// Disable the ADC
+	PRR |= _BV(PRADC);
+
+	// Disable the WDT
+	MCUSR &= ~_BV(WDRF);
+	WDTCSR &= ~_BV(WDIE);
+	WDTCSR &= ~_BV(WDE);
+
+	// Set the sleep mode to power down
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
