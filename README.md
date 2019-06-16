@@ -7,11 +7,12 @@ warranted). The trigger is a snap-action limit switch that is attached
 directly to the rifle's trigger housing via a PCB. The trigger is debounced
 entirely in hardware, which enables for direct interrupt control on the MCU
 and simpler code overall. The trigger debouncing consists of an RC-filter
-pass through a Schmitt trigger to produce an excellent digital signal for
-the MCU. THe programming switches are not debounced and do not have to be
+passed through a Schmitt trigger to produce an excellent digital signal for
+the MCU. The programming switches are not debounced and do not have to be
 because having the ISR for the switches run more than once does not affect
 system's functionality. Not having any debounce on the switches reduces the
-size and cost of the PCB and the complexity of the firmware. 
+size and cost of the PCB (if debounced in hardware) or the complexity of 
+the firmware (if debounced in software). 
 
 ## How it Works
 The system maximizes its use of the AVR's hardware features to
