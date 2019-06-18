@@ -56,4 +56,4 @@ valve.
 ### worm v1.0
 This is the first revision of the fire control unit. It includes the features described above and additional circuitry for detecting low battery. 
 
-[worm v1.0](https://i.imgur.com/vMBrBP3.jpg)
+![worm v1.0](https://i.imgur.com/vMBrBP3.jpg)
