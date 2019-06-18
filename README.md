@@ -52,3 +52,8 @@ corresponding ISR calculates the new timer compare value for the
 new switch settings. A delay constant is added to the time
 represented by the switches to account for the lag of the solenoid
 valve.
+
+### worm v1.0
+This is the first revision of the fire control unit. It includes the features described above and additional circuitry for detecting low battery. 
+
+[worm v1.0](https://i.imgur.com/vMBrBP3.jpg)
