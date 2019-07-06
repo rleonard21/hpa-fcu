@@ -54,6 +54,6 @@ represented by the switches to account for the lag of the solenoid
 valve.
 
 ### worm v1.0
-This is the first revision of the fire control unit. It includes the features described above and additional circuitry for detecting low battery. 
+This is the first revision of the fire control unit. It includes the features described above and additional circuitry for detecting low battery. The low battery detection does not function (I used an N-channel MOSFET as a high side switch...). The `worm v1.0` hardware draws 3.4uA when powered with 5v. 
 
 ![worm v1.0](https://i.imgur.com/vMBrBP3.jpg)
