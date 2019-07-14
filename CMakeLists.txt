@@ -4,6 +4,9 @@ project(hpa_fcu)
 
 set(CMAKE_C_STANDARD 99)
 
+SET(CMAKE_C_COMPILER /usr/local/bin/avr-gcc)
+SET(CMAKE_CXX_COMPILER /usr/local/bin/avr-g++)
+
 # Define some constants
 set(AVR_MCU "atmega328p")
 set(AVR_SPEED "16000000")
