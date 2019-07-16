@@ -1,5 +1,6 @@
 // main.c
 // Written by Robert Leonard
+// worm-v1.1 Hardware FCU
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -10,8 +11,14 @@
 #define TRIGGER_BIT		PORTB0
 #define TRIGGER 		PINB
 
-#define PROG_PORT		PORTD
-#define PROG			PIND
+#define PROG_DDR_0      DDRC    /* DDR for the lower bits of the programming switches */
+#define PROG_DDR_1      DDRD    /* DDR for the upper bits of the programming switches */
+#define PROG_PORT_0     PORTC   /* Port for the lower bits of the programming switches */
+#define PROG_PORT_1     PORTD   /* Port for the upper bits of the programming switches */
+#define PROG_PIN_0      PINC    /* Pin for the lower bits of the programming switches */
+#define PROG_PIN_1      PIND    /* Pin for the upper bits of the programming switches */
+#define PROG_MSK_0      0xFF    /* TODO Bit mask for reading the lower bits of programming switches */
+#define PROG_MSK_1      0xFF    /* TODO Bit mask for reading the upper bits of programming switches */
 
 #define SOL_DDR			DDRB
 #define SOL_BIT 		PORTB1
@@ -23,9 +30,10 @@
 void pin_setup(void);
 void interrupt_setup(void);
 void power_setup(void);
+void update_timer_counter(void);
 uint16_t calc_compare_val(void);
 
-// Flag for determining if the system is handling a trigger interrupt sequence.
+// EFFECTS: Flag for determining if the system is handling a trigger interrupt sequence.
 volatile uint8_t trigger_pulled_flag;
 
 int main(void) {
@@ -35,6 +43,9 @@ int main(void) {
 	// Set up all pins for I/O
 	pin_setup();
 	interrupt_setup();
+
+	// Get the timer counter value from the programming switches
+	update_timer_counter();
 
 	// Set the flag to false, indicating system is not handling a trigger pull.
 	trigger_pulled_flag = 0;
@@ -75,7 +86,7 @@ ISR(PCINT0_vect) {
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
-// EFFECTS:	Enables set OC1A on match and disables and resets TIMER1.
+// EFFECTS:	Enables set OC1A on match and disables and resets TIMER1. Updates timer counter from switches.
 // NOTE:	OC1A clears in hardware immediately on match
 ISR(TIMER1_COMPA_vect) {
 	// Disable and reset TIMER1
@@ -84,6 +95,9 @@ ISR(TIMER1_COMPA_vect) {
 
 	// Enable set OC1A on match
 	TCCR1A |= _BV(COM1A0);
+
+	// Update the counter value from the programming switches
+	update_timer_counter();
 
 	// System has completed handling the trigger sequence
 	trigger_pulled_flag = 0;
@@ -97,10 +111,10 @@ ISR(PCINT2_vect) {
 
 // EFFECTS: Sets the data direction and pull-ups for each IO pin
 void pin_setup(void) {
-	// TRIGGER INTERRUPT (Input, Pullup Disabled)
+	// TRIGGER INTERRUPT (Input, Pull-up Disabled)
 	// No operations here, DDR and PORT initialize to correct values by default
 
-	// PROGRAMMING SWITCHES [7:0] (Input, Pullup Enabled; DDR defaults to 0)
+	// PROGRAMMING SWITCHES [7:0] (Input, Pull-up Enabled; DDR defaults to 0)
 	PROG_PORT = 0xFF;
 
 	// SOLENOID (Output, preset OC1A to set on match)
@@ -156,6 +170,21 @@ void power_setup(void) {
 
 	// Set the sleep mode to power down
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+}
+
+// EFFECTS: Enables, reads, and disables the programming switches to update the counter value
+void update_timer_counter(void) {
+	// Enable the pull-up resistors for the programming switches
+	// TODO
+
+	// Read the programming switches
+	// TODO
+
+	// Calculate the new compare value
+	// TODO
+
+	// Disable the pull-up resistors on the programming switches
+	// TODO
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
