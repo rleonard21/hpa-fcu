@@ -8,6 +8,7 @@
 
 #define F_CPU 			16000000
 
+// TODO: port to hv1.1
 #define TRIGGER_BIT		PORTB0
 #define TRIGGER 		PINB
 
@@ -20,9 +21,12 @@
 #define PROG_MSK_0      0xFF    /* TODO Bit mask for reading the lower bits of programming switches */
 #define PROG_MSK_1      0xFF    /* TODO Bit mask for reading the upper bits of programming switches */
 
+// TODO: port to hv1.1
 #define SOL_DDR			DDRB
 #define SOL_BIT 		PORTB1
 
+// TODO
+#define CLKSEL          0xFF    /* TIMER1 prescaler mask */
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
 #define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
 #define DELAY_FACTOR	10		/* Changes the increment value of the prog. switches */
@@ -31,7 +35,7 @@ void pin_setup(void);
 void interrupt_setup(void);
 void power_setup(void);
 void update_timer_counter(void);
-uint16_t calc_compare_val(void);
+uint16_t calc_compare_val(uint8_t prog_setting);
 
 // EFFECTS: Flag for determining if the system is handling a trigger interrupt sequence.
 volatile uint8_t trigger_pulled_flag;
@@ -76,12 +80,15 @@ ISR(PCINT0_vect) {
 	trigger_pulled_flag = 1;
 
 	// Force output compare to set solenoid
+	// TODO: port to hv1.1
 	TCCR1C |= _BV(FOC1A);
 
 	// Enable clear OC1A on output compare
+	// TODO: port to hv1.1
 	TCCR1A &= ~_BV(COM1A0);
 
 	// Enable TIMER1, pre-scalar=64
+	// TODO: port to hv1.1
 	TCCR1B |= _BV(CS11) | _BV(CS10);
 }
 
@@ -90,10 +97,12 @@ ISR(PCINT0_vect) {
 // NOTE:	OC1A clears in hardware immediately on match
 ISR(TIMER1_COMPA_vect) {
 	// Disable and reset TIMER1
+	// TODO: port to hv1.1
 	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);
 	TCNT1 = 0;
 
 	// Enable set OC1A on match
+	// TODO: port to hv1.1
 	TCCR1A |= _BV(COM1A0);
 
 	// Update the counter value from the programming switches
@@ -103,43 +112,40 @@ ISR(TIMER1_COMPA_vect) {
 	trigger_pulled_flag = 0;
 }
 
-// ISR:	    Triggered by any change in the programming switches (PCINT2)
-// EFFECTS: Sets the CTC compare value to the value calculated from the switches
-ISR(PCINT2_vect) {
-	OCR1A = calc_compare_val();
-}
-
 // EFFECTS: Sets the data direction and pull-ups for each IO pin
 void pin_setup(void) {
 	// TRIGGER INTERRUPT (Input, Pull-up Disabled)
 	// No operations here, DDR and PORT initialize to correct values by default
 
-	// PROGRAMMING SWITCHES [7:0] (Input, Pull-up Enabled; DDR defaults to 0)
-	PROG_PORT = 0xFF;
+	// TRIGGER SWITCH (Input, Pull-up Enabled)
+	// Note: This value is never read, but the internal pull-up is used
+	// TODO
 
-	// SOLENOID (Output, preset OC1A to set on match)
+	// PROGRAMMING SWITCHES [7:0] (Input, Pull-up Disabled; DDR defaults to 0)
+	// No operations here, DDR and PORT initialize to correct values by default
+
+	// SOLENOID (Output, attach to OC1B and preset to set on match)
 	SOL_DDR |= _BV(SOL_BIT);
-	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
+	//	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
+	// TODO
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
 	// ...
 }
 
-// EFFECTS: Initializes the interrupt registers for trigger, timer, and prog. switches
+// EFFECTS: Initializes the interrupt registers for the trigger and timer
 void interrupt_setup(void) {
 	// TRIGGER EXTERNAL INTERRUPT
+	// TODO: port to hv1.1
 	PCICR |= _BV(PCIE0);		// Enable the PCI-0 ISR (PORTB)
 	PCMSK0 |= _BV(TRIGGER_BIT);	// Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
+	// TODO: port to hv1.1
 	TCCR1B |= _BV(WGM12);		// Setup timer for CTC mode
-	OCR1A = calc_compare_val(); // Initialize the compare value
+	OCR1A = calc_compare_val(0); // Initialize the compare value
 	TIMSK1 |= _BV(OCIE1A);		// Enable the CTC interrupt vector
-
-	// PROGRAMMING SWITCHES INTERRUPT
-	PCICR |= _BV(PCIE2);		// Enable the PCI-2 ISR (PORTD)
-	PCMSK2 = 0xFF;				// Enable all pins on PCI[23:16] (PORTD) as interrupts
 
 	// SETUP
 	sei();						// Enable global interrupts
@@ -180,17 +186,17 @@ void update_timer_counter(void) {
 	// Read the programming switches
 	// TODO
 
-	// Calculate the new compare value
+	// Disable the pull-up resistors on the programming switches
 	// TODO
 
-	// Disable the pull-up resistors on the programming switches
+	// Calculate and set the new compare value
 	// TODO
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
 //			given the desired millisecond input on the PROG switches.
 // NOTE:	Programming switches are a binary representation of 0.1ms increments.
-uint16_t calc_compare_val(void) {
+uint16_t calc_compare_val(uint8_t prog_setting) {
 	return (uint16_t)(F_CPU / (1000 * DELAY_FACTOR) / PRESCALER *
-					  ((uint8_t)~PROG + DELAY_CONSTANT));
+					  (prog_setting + DELAY_CONSTANT));
 }
