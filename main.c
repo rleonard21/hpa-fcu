@@ -16,14 +16,6 @@
 #define SOL_DDR			DDRB
 #define SOL_BIT 		PORTB1
 
-#define RED_LED_DDR		DDRB
-#define RED_LED_PORT	PORTB
-#define RED_LED_BIT		PORTB3
-
-#define GREEN_LED_DDR	DDRB
-#define GREEN_LED_PORT	PORTB
-#define GREEN_LED_BIT	PORTB5
-
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
 #define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
 #define DELAY_FACTOR	10		/* Changes the increment value of the prog. switches */
@@ -47,11 +39,9 @@ int main(void) {
 	// Set the flag to false, indicating system is not handling a trigger pull.
 	trigger_pulled_flag = 0;
 
-	// TODO: implement the one-time battery voltage check and flash LEDs
-
 	while(1) {
 		if(!trigger_pulled_flag) {
-			// Enables sleep and puts the device under
+			// Enable sleep and put the device under
 			sleep_enable();
 			sleep_mode();
 
@@ -116,10 +106,6 @@ void pin_setup(void) {
 	// SOLENOID (Output, preset OC1A to set on match)
 	SOL_DDR |= _BV(SOL_BIT);
 	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
-
-	// LED INDICATORS (Output, initially low; PORT defaults to zero)
-	RED_LED_DDR |= _BV(RED_LED_BIT);
-	GREEN_LED_DDR |= _BV(GREEN_LED_BIT);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs
