@@ -14,19 +14,21 @@
 #define TRIGGER_PU_PORT PORTB   /* PORT for the pre-inverter trigger internal pull-up */
 #define TRIGGER_PU_BIT  PORTB1  /* Bit number for the pull-up */
 
-#define PROG_DDR_0      DDRC    /* DDR for the lower bits of the programming switches */
-#define PROG_DDR_1      DDRD    /* DDR for the upper bits of the programming switches */
 #define PROG_PORT_0     PORTC   /* Port for the lower bits of the programming switches */
 #define PROG_PORT_1     PORTD   /* Port for the upper bits of the programming switches */
 #define PROG_PIN_0      PINC    /* Pin for the lower bits of the programming switches */
 #define PROG_PIN_1      PIND    /* Pin for the upper bits of the programming switches */
-#define PROG_MSK_0      0xFF    /* TODO Bit mask for reading the lower bits of programming switches */
-#define PROG_MSK_1      0xFF    /* TODO Bit mask for reading the upper bits of programming switches */
+#define PROG_MSK_0      0x7F    /* Bit mask for reading the lower bits of programming switches */
+#define PROG_MSK_1      0x07    /* Bit mask for reading the upper bits of programming switches */
+
+#define C_UNUSED_MSK    0x00    /* Bit mask for the unused pins on PORTC */
+#define D_UNUSED_MSK    0x1F    /* Bit mask for the unused pins on PORTD */
 
 #define VALVE_DDR		DDRB    /* Solenoid valve port */
 #define VALVE_BIT 		PORTB1  /* Solenoid valve bit */
 
 // TODO
+#define CLK_SCALER      ( (1 << CS11) | (1 << CS10) )
 #define CLKSEL          0xFF    /* TIMER1 prescaler mask */
 #define PRESCALER 		64		/* TIMER1 prescaler as defined by the datasheet */
 #define DELAY_CONSTANT	10		/* Accounts for the response time of the solenoid */
@@ -36,6 +38,7 @@ void pin_setup(void);
 void interrupt_setup(void);
 void power_setup(void);
 void update_timer_counter(void);
+void enable_programming_switches(void);
 uint16_t calc_compare_val(uint8_t prog_setting);
 
 // EFFECTS: Flag for determining if the system is handling a trigger interrupt sequence.
@@ -69,9 +72,9 @@ int main(void) {
 
 // ISR:		Triggered by a change on the trigger pin.
 // EFFECTS:	Solenoid is energized on trigger rising edge
-// NOTE:	OC1A is preset to set on output compare
+// NOTE:	OC1B is preset to set on output compare
 ISR(PCINT0_vect) {
-	// Do nothing if the trigger has been released
+	// Do nothing on a trigger rising edge
 	if(!(TRIGGER & _BV(TRIGGER_BIT))) return;
 
 	// Do nothing if currently handling trigger pull
@@ -81,30 +84,25 @@ ISR(PCINT0_vect) {
 	trigger_pulled_flag = 1;
 
 	// Force output compare to set solenoid
-	// TODO: port to hv1.1
-	TCCR1C |= _BV(FOC1A);
+	TCCR1C |= _BV(FOC1B);
 
 	// Enable clear OC1A on output compare
-	// TODO: port to hv1.1
-	TCCR1A &= ~_BV(COM1A0);
+	TCCR1A &= ~_BV(COM1B0);
 
 	// Enable TIMER1, pre-scalar=64
-	// TODO: port to hv1.1
-	TCCR1B |= _BV(CS11) | _BV(CS10);
+	TCCR1B |= CLK_SCALER;
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
-// EFFECTS:	Enables set OC1A on match and disables and resets TIMER1. Updates timer counter from switches.
-// NOTE:	OC1A clears in hardware immediately on match
+// EFFECTS:	Enables set OC1B on match and disables and resets TIMER1. Updates timer counter from switches.
+// NOTE:	OC1B clears in hardware immediately on match
 ISR(TIMER1_COMPA_vect) {
 	// Disable and reset TIMER1
-	// TODO: port to hv1.1
-	TCCR1B &=  ~_BV(CS11) & ~_BV(CS10);
+	TCCR1B &=  ~CLK_SCALER;
 	TCNT1 = 0;
 
-	// Enable set OC1A on match
-	// TODO: port to hv1.1
-	TCCR1A |= _BV(COM1A0);
+	// Enable set OC1B on match
+	TCCR1A |= _BV(COM1B0);
 
 	// Update the counter value from the programming switches
 	update_timer_counter();
@@ -120,7 +118,7 @@ void pin_setup(void) {
 
 	// TRIGGER SWITCH (Input, Pull-up Enabled)
 	// Note: This value is never read, but the internal pull-up is used
-	TRIGGER_PU_PORT |= _BV(TRIGGER_PU_BIT)
+	TRIGGER_PU_PORT |= _BV(TRIGGER_PU_BIT);
 
 	// PROGRAMMING SWITCHES [7:0] (Input, Pull-up Disabled; DDR defaults to 0)
 	// No operations here, DDR and PORT initialize to correct values by default
@@ -191,6 +189,12 @@ void update_timer_counter(void) {
 
 	// Calculate and set the new compare value
 	// TODO
+}
+
+// EFFECTS: enables the internal pull-ups on the programming switches
+void enable_programming_switches(void) {
+	PROG_PORT_0 |= PROG_MSK_0;
+	PROG_PORT_1 |= PROG_MSK_1;
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
