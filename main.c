@@ -5,6 +5,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
+#include <util/delay.h>
 
 #define TRIGGER_BIT     PORTB0
 #define TRIGGER_PIN     PINB
@@ -22,10 +23,9 @@
 #define C_UNUSED_MSK    0x01    /* Bit mask for the unused pins on PORTC */
 #define D_UNUSED_MSK    0x1F    /* Bit mask for the unused pins on PORTD */
 
-#define VALVE_DDR        DDRB   /* Solenoid valve port */
-#define VALVE_BIT        PORTB1 /* Solenoid valve bit */
+#define VALVE_DDR       DDRB    /* Solenoid valve port */
+#define VALVE_BIT       PORTB2  /* Solenoid valve bit */
 
-// TODO
 #define CLK_SCALER      ( (1 << CS11) | (1 << CS10) )
 #define CLKSEL          0xFF    /* TIMER1 prescaler mask */
 #define PRESCALER       64      /* TIMER1 prescaler as defined by the datasheet */
@@ -113,7 +113,7 @@ ISR(PCINT0_vect) {
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
 // EFFECTS:	Enables set OC1B on match and disables and resets TIMER1. Updates timer counter from switches.
 // NOTE:	OC1B clears in hardware immediately on match
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER1_COMPB_vect) {
 	// Disable and reset TIMER1
 	TCCR1B &= ~CLK_SCALER;
 	TCNT1 = 0;
@@ -152,14 +152,14 @@ void pin_setup(void) {
 // EFFECTS: Initializes the interrupt registers for the trigger and timer
 void interrupt_setup(void) {
 	// TRIGGER EXTERNAL INTERRUPT
-	// TODO: port to hv1.1
 	PCICR |= _BV(PCIE0);         // Enable the PCI-0 ISR (PORTB)
-	PCMSK0 |= _BV(TRIGGER_BIT);     // Enable PORTB0 for PCINT (PCINT0)
+	PCMSK0 |= _BV(TRIGGER_BIT);  // Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
-	TCCR1B |= _BV(WGM12);         // Setup timer for CTC mode
-	OCR1B = calc_compare_val(0); // Initialize the compare value
-	TIMSK1 |= _BV(OCIE1B);         // Enable the CTC interrupt vector
+	TCCR1B |= _BV(WGM12);       // Setup timer for CTC mode
+	TIMSK1 |= _BV(OCIE1B);      // Enable the CTC interrupt vector
+	OCR1A = 0xFFFF;             // Set the top of the timer to MAX
+	update_timer_counter();     // Update the OCR1B counter compare value
 
 	// SETUP
 	sei();                         // Enable global interrupts
@@ -221,7 +221,8 @@ void disable_programming_switches(void) {
 
 // EFFECTS: reads the programming switches as an 8-bit number
 uint8_t read_programming_switches(void) {
-	return (uint8_t) ((PROG_PIN_0 & PROG_MSK_0) | (PROG_PIN_1 & PROG_MSK_1));
+	// TODO: shift the bits over to match the right place
+	return ~(uint8_t) ((PROG_PIN_0 & PROG_MSK_0) | (PROG_PIN_1 & PROG_MSK_1));
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
