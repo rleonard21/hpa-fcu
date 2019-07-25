@@ -9,7 +9,7 @@
 #define F_CPU 			12000000
 
 #define TRIGGER_BIT		PORTB0
-#define TRIGGER 		PINB
+#define TRIGGER_PIN		PINB
 
 #define TRIGGER_PU_PORT PORTB   /* PORT for the pre-inverter trigger internal pull-up */
 #define TRIGGER_PU_BIT  PORTB1  /* Bit number for the pull-up */
@@ -21,7 +21,7 @@
 #define PROG_MSK_0      0x7F    /* Bit mask for reading the lower bits of programming switches */
 #define PROG_MSK_1      0x07    /* Bit mask for reading the upper bits of programming switches */
 
-#define C_UNUSED_MSK    0x00    /* Bit mask for the unused pins on PORTC */
+#define C_UNUSED_MSK    0x01    /* Bit mask for the unused pins on PORTC */
 #define D_UNUSED_MSK    0x1F    /* Bit mask for the unused pins on PORTD */
 
 #define VALVE_DDR		DDRB    /* Solenoid valve port */
@@ -39,6 +39,8 @@ void interrupt_setup(void);
 void power_setup(void);
 void update_timer_counter(void);
 void enable_programming_switches(void);
+void disable_programming_switches(void);
+uint8_t read_programming_switches(void);
 uint16_t calc_compare_val(uint8_t prog_setting);
 
 // EFFECTS: Flag for determining if the system is handling a trigger interrupt sequence.
@@ -75,7 +77,7 @@ int main(void) {
 // NOTE:	OC1B is preset to set on output compare
 ISR(PCINT0_vect) {
 	// Do nothing on a trigger rising edge
-	if(!(TRIGGER & _BV(TRIGGER_BIT))) return;
+	if(!(TRIGGER_PIN & _BV(TRIGGER_BIT))) return;
 
 	// Do nothing if currently handling trigger pull
 	if(trigger_pulled_flag) return;
@@ -127,26 +129,25 @@ void pin_setup(void) {
 	VALVE_DDR |= _BV(VALVE_BIT);
 	TCCR1A |= _BV(COM1B1) | _BV(COM1B0);
 
-	// UNUSED PINS (Input, Pullup Enabled)
-	// TODO: all remaining unused pins should be pulled up inputs
-	// ...
+	// UNUSED PINS (Input, Pull-up Enabled)
+	PORTC |= C_UNUSED_MSK;
+	PORTD |= D_UNUSED_MSK;
 }
 
 // EFFECTS: Initializes the interrupt registers for the trigger and timer
 void interrupt_setup(void) {
 	// TRIGGER EXTERNAL INTERRUPT
 	// TODO: port to hv1.1
-	PCICR |= _BV(PCIE0);		// Enable the PCI-0 ISR (PORTB)
-	PCMSK0 |= _BV(TRIGGER_BIT);	// Enable PORTB0 for PCINT (PCINT0)
+	PCICR |= _BV(PCIE0);		 // Enable the PCI-0 ISR (PORTB)
+	PCMSK0 |= _BV(TRIGGER_BIT);	 // Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
-	// TODO: port to hv1.1
-	TCCR1B |= _BV(WGM12);		// Setup timer for CTC mode
-	OCR1A = calc_compare_val(0); // Initialize the compare value
-	TIMSK1 |= _BV(OCIE1A);		// Enable the CTC interrupt vector
+	TCCR1B |= _BV(WGM12);		 // Setup timer for CTC mode
+	OCR1B = calc_compare_val(0); // Initialize the compare value
+	TIMSK1 |= _BV(OCIE1B);		 // Enable the CTC interrupt vector
 
 	// SETUP
-	sei();						// Enable global interrupts
+	sei();						 // Enable global interrupts
 }
 
 // EFFECTS: Modifies necessary registers for reducing power consumption
@@ -179,13 +180,13 @@ void power_setup(void) {
 // EFFECTS: Enables, reads, and disables the programming switches to update the counter value
 void update_timer_counter(void) {
 	// Enable the pull-up resistors for the programming switches
-	// TODO
+	enable_programming_switches();
 
 	// Read the programming switches
-	// TODO
+	uint8_t prog = read_programming_switches();
 
 	// Disable the pull-up resistors on the programming switches
-	// TODO
+	disable_programming_switches();
 
 	// Calculate and set the new compare value
 	// TODO
@@ -195,6 +196,17 @@ void update_timer_counter(void) {
 void enable_programming_switches(void) {
 	PROG_PORT_0 |= PROG_MSK_0;
 	PROG_PORT_1 |= PROG_MSK_1;
+}
+
+// EFFECTS: disables the internal pull-ups on the programming switches
+void disable_programming_switches(void) {
+	PROG_PORT_0 &= ~PROG_MSK_0;
+	PROG_PORT_1 &= ~PROG_MSK_1;
+}
+
+// EFFECTS: reads the programming switches as an 8-bit number
+uint8_t read_programming_switches(void) {
+	return (PROG_PIN_0 & PROG_MSK_0) | (PROG_PIN_1 & PROG_MSK_1);
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
