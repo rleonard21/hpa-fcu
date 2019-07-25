@@ -6,11 +6,13 @@
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
 
-#define F_CPU 			16000000
+#define F_CPU 			12000000
 
-// TODO: port to hv1.1
 #define TRIGGER_BIT		PORTB0
 #define TRIGGER 		PINB
+
+#define TRIGGER_PU_PORT PORTB   /* PORT for the pre-inverter trigger internal pull-up */
+#define TRIGGER_PU_BIT  PORTB1  /* Bit number for the pull-up */
 
 #define PROG_DDR_0      DDRC    /* DDR for the lower bits of the programming switches */
 #define PROG_DDR_1      DDRD    /* DDR for the upper bits of the programming switches */
@@ -21,9 +23,8 @@
 #define PROG_MSK_0      0xFF    /* TODO Bit mask for reading the lower bits of programming switches */
 #define PROG_MSK_1      0xFF    /* TODO Bit mask for reading the upper bits of programming switches */
 
-// TODO: port to hv1.1
-#define SOL_DDR			DDRB
-#define SOL_BIT 		PORTB1
+#define VALVE_DDR		DDRB    /* Solenoid valve port */
+#define VALVE_BIT 		PORTB1  /* Solenoid valve bit */
 
 // TODO
 #define CLKSEL          0xFF    /* TIMER1 prescaler mask */
@@ -44,7 +45,7 @@ int main(void) {
 	// Set up the power reduction registers
 	power_setup();
 
-	// Set up all pins for I/O
+	// Set up all I/O pins
 	pin_setup();
 	interrupt_setup();
 
@@ -119,15 +120,14 @@ void pin_setup(void) {
 
 	// TRIGGER SWITCH (Input, Pull-up Enabled)
 	// Note: This value is never read, but the internal pull-up is used
-	// TODO
+	TRIGGER_PU_PORT |= _BV(TRIGGER_PU_BIT)
 
 	// PROGRAMMING SWITCHES [7:0] (Input, Pull-up Disabled; DDR defaults to 0)
 	// No operations here, DDR and PORT initialize to correct values by default
 
-	// SOLENOID (Output, attach to OC1B and preset to set on match)
-	SOL_DDR |= _BV(SOL_BIT);
-	//	TCCR1A |= _BV(COM1A1) | _BV(COM1A0);
-	// TODO
+	// SOLENOID (Output, attach to OC1B and preset to set on timer compare match)
+	VALVE_DDR |= _BV(VALVE_BIT);
+	TCCR1A |= _BV(COM1B1) | _BV(COM1B0);
 
 	// UNUSED PINS (Input, Pullup Enabled)
 	// TODO: all remaining unused pins should be pulled up inputs

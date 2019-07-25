@@ -9,7 +9,7 @@ SET(CMAKE_CXX_COMPILER /usr/local/bin/avr-g++)
 
 # Define some constants
 set(AVR_MCU "atmega328p")
-set(AVR_SPEED "16000000")
+set(AVR_SPEED "12000000")
 set(AVR_OPT "s")
 
 # Define compiler flags
