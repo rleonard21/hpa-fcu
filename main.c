@@ -5,10 +5,9 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
-#include <util/delay.h>
 
-#define TRIGGER_BIT     PORTB0
-#define TRIGGER_PIN     PINB
+#define TRIGGER_BIT     PORTB0  /* Bit number for the trigger input */
+#define TRIGGER_PIN     PINB    /* Read pin port for the trigger input */
 
 #define TRIGGER_PU_PORT PORTB   /* PORT for the pre-inverter trigger internal pull-up */
 #define TRIGGER_PU_BIT  PORTB1  /* Bit number for the pull-up */
@@ -26,11 +25,10 @@
 #define VALVE_DDR       DDRB    /* Solenoid valve port */
 #define VALVE_BIT       PORTB2  /* Solenoid valve bit */
 
-#define CLK_SCALER      ( (1 << CS11) | (1 << CS10) )
-#define CLKSEL          0xFF    /* TIMER1 prescaler mask */
+#define CLKSEL          ((1 << CS11) | (1 << CS10)) /* TIMER1 prescaler mask (64) */
 #define PRESCALER       64      /* TIMER1 prescaler as defined by the datasheet */
-#define DELAY_CONSTANT  10      /* Accounts for the response time of the solenoid */
-#define DELAY_FACTOR    10      /* Changes the increment value of the prog. switches */
+#define DELAY_CONSTANT  100     /* Time constant to account for the response time of the solenoid */
+#define DELAY_FACTOR    1       /* Changes the increment value of the prog. switches */
 
 // EFFECTS: Sets the data direction and pull-ups for each IO pin
 void pin_setup(void);
@@ -59,7 +57,6 @@ uint16_t calc_compare_val(uint8_t prog_setting);
 
 // EFFECTS: Flag for determining if the system is handling a trigger interrupt sequence.
 volatile uint8_t trigger_pulled_flag;
-
 
 int main(void) {
 	// Set up the power reduction registers
@@ -107,7 +104,7 @@ ISR(PCINT0_vect) {
 	TCCR1A &= ~_BV(COM1B0);
 
 	// Enable TIMER1, pre-scalar=64
-	TCCR1B |= CLK_SCALER;
+	TCCR1B |= CLKSEL;
 }
 
 // ISR:		Triggered by a match compare on TIMER1 (CTC mode non-PWM)
@@ -115,7 +112,7 @@ ISR(PCINT0_vect) {
 // NOTE:	OC1B clears in hardware immediately on match
 ISR(TIMER1_COMPB_vect) {
 	// Disable and reset TIMER1
-	TCCR1B &= ~CLK_SCALER;
+	TCCR1B &= ~CLKSEL;
 	TCNT1 = 0;
 
 	// Enable set OC1B on match
@@ -156,13 +153,13 @@ void interrupt_setup(void) {
 	PCMSK0 |= _BV(TRIGGER_BIT);  // Enable PORTB0 for PCINT (PCINT0)
 
 	// TRIGGER TIMER INTERRUPT
-	TCCR1B |= _BV(WGM12);       // Setup timer for CTC mode
-	TIMSK1 |= _BV(OCIE1B);      // Enable the CTC interrupt vector
-	OCR1A = 0xFFFF;             // Set the top of the timer to MAX
-	update_timer_counter();     // Update the OCR1B counter compare value
+	TCCR1B |= _BV(WGM12);        // Setup timer for CTC mode
+	TIMSK1 |= _BV(OCIE1B);       // Enable the CTC interrupt vector
+	OCR1A = 0xFFFF;              // Set the top of the timer to MAX
+	update_timer_counter();      // Update the OCR1B counter compare value
 
 	// SETUP
-	sei();                         // Enable global interrupts
+	sei();                       // Enable global interrupts
 }
 
 // EFFECTS: Modifies necessary registers for reducing power consumption
@@ -221,14 +218,22 @@ void disable_programming_switches(void) {
 
 // EFFECTS: reads the programming switches as an 8-bit number
 uint8_t read_programming_switches(void) {
-	// TODO: shift the bits over to match the right place
-	return ~(uint8_t) ((PROG_PIN_0 & PROG_MSK_0) | (PROG_PIN_1 & PROG_MSK_1));
+	// It's a little nasty, but it reads each pin as a particular bit of the 8-bit value
+	return ~(unsigned char) (
+			(PROG_PIN_0 & _BV(1)) << 6 |
+			(PROG_PIN_0 & _BV(2)) << 4 |
+			(PROG_PIN_0 & _BV(3)) << 2 |
+			(PROG_PIN_0 & _BV(4)) << 0 |
+			(PROG_PIN_0 & _BV(5)) >> 2 |
+			(PROG_PIN_1 & _BV(0)) << 2 |
+			(PROG_PIN_1 & _BV(1)) << 0 |
+			(PROG_PIN_1 & _BV(2)) >> 2
+	);
 }
 
 // EFFECTS: Computes the required output compare value for the CTC timer
 //			given the desired millisecond input on the PROG switches.
 // NOTE:	Programming switches are a binary representation of 0.1ms increments.
 uint16_t calc_compare_val(uint8_t prog_setting) {
-	return (uint16_t) (F_CPU / (1000 * DELAY_FACTOR) / PRESCALER *
-	                   (prog_setting + DELAY_CONSTANT));
+	return (uint16_t) ((prog_setting) * (F_CPU / 1000 / DELAY_FACTOR / PRESCALER));
 }
